@@ -1,7 +1,39 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+
+const users = [
+  { username: 'admin', password: 'admin' }
+];
+
+app.post('/login', (req, res) => {
+  const { username, password } = req.body || {};
+  const user = users.find(u => u.username === username && u.password === password);
+  if (!user) {
+    return res.status(401).json({ error: 'Identifiants invalides' });
+  }
+  const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '5m' });
+  res.status(200).json({ token });
+});
+
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token manquant' });
+  }
+  try {
+    req.user = jwt.verify(header.split(' ')[1], JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token invalide ou expiré' });
+  }
+}
+
+app.use('/products', auth);
 
 let products = [
   { id: 1, name: 'Clavier', description: 'Clavier mécanique', price: 79.99, category: 'Informatique' },
@@ -73,6 +105,8 @@ app.delete('/products/:id', (req, res) => {
   res.status(204).send();
 });
 
-app.listen(3000, () => {
-  console.log('API démarrée sur http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`API démarrée sur http://localhost:${PORT}`);
 });
