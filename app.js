@@ -1,8 +1,29 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import { rateLimit } from 'express-rate-limit';
 
 const app = express();
 app.use(express.json());
+
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  ipv6Subnet: 56,
+  message: { error: 'Trop de requêtes, réessayez dans une minute' }
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000, 
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  ipv6Subnet: 56,
+  message: { error: 'Trop de tentatives de connexion, réessayez dans une minute' }
+});
+
+app.use(globalLimiter);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -10,7 +31,7 @@ const users = [
   { username: 'admin', password: 'admin' }
 ];
 
-app.post('/login', (req, res) => {
+app.post('/login', loginLimiter, (req, res) => {
   const { username, password } = req.body || {};
   const user = users.find(u => u.username === username && u.password === password);
   if (!user) {
